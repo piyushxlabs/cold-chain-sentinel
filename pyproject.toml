@@ -1,0 +1,31 @@
+[project]
+name = "cold-chain-sentinel"
+version = "0.1.0"
+description = "Autonomous event-driven voice-telephony and logistics compliance agent for cold-chain reefer excursions"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "langgraph>=1.2.11",
+    "langgraph-checkpoint-sqlite>=2.0.0",
+    "langgraph-checkpoint-postgres>=2.0.0",
+    "pydantic>=2.13.5,<3",
+    "fastapi>=0.141.1",
+    "uvicorn[standard]>=0.34.0",
+    "google-genai>=0.1.1",
+    "calle-ai>=0.1.0",
+    "langfuse>=4.15.2",
+    "opentelemetry-api>=1.44.0",
+    "opentelemetry-sdk>=1.44.0",
+    "opentelemetry-instrumentation-fastapi>=0.65b0",
+    "httpx>=0.28.0",
+    "psycopg[binary]>=3.2.0",
+    "python-dotenv>=1.0.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[tool.uv]
