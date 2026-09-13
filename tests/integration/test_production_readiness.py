@@ -116,8 +116,9 @@ def test_skill_standalone_execution():
 
     # Verify task prompt started with Call + phone and recipient region is US
     call_args = mock_calle.calls.create_and_wait.call_args[1]
-    assert call_args["task"].startswith("Call +12065550198 and speak with driver Elena Rostova")
+    assert call_args["task"].startswith("Call +12065550198 and speak with commercial driver Elena Rostova")
     assert call_args["recipient"]["region"] == "US"
+    assert call_args["recipient"]["phones"] == ["+12065550198"]
 
 
 def test_skill_standalone_execution_india_region():
@@ -155,7 +156,7 @@ def test_skill_standalone_execution_india_region():
 
     assert output.task_completed is True
     call_args = mock_calle.calls.create_and_wait.call_args[1]
-    assert call_args["recipient"]["phone"] == "+916395536126"
+    assert call_args["recipient"]["phones"] == ["+916395536126"]
     assert call_args["recipient"]["region"] == "IN"
 
 

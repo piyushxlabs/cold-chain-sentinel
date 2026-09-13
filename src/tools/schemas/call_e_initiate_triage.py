@@ -5,6 +5,7 @@ Authoritative specification: DOCS/AGENT_LOGIC_SPEC.md Section 4 & 5.
 
 from __future__ import annotations
 
+import copy
 from typing import Any, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -68,9 +69,33 @@ class CallETriageOutput(BaseModel):
     structured_result: Optional[CallETriageStructuredResult] = Field(
         default=None, description="Extracted driver observations"
     )
-    evidence: dict[str, Any] = Field(default_factory=dict, description="Call evidence reference metadata")
+    evidence: Any = Field(default_factory=dict, description="Call evidence reference metadata (dict, list, or str)")
     error: Optional[str] = Field(default=None, description="Error description if call failed")
 
 
-# Default strict JSON Schema for CALL-E result_schema parameter
-CALLE_TRIAGE_RESULT_JSON_SCHEMA = CallETriageStructuredResult.model_json_schema()
+def sanitize_json_schema_for_calle(schema: dict[str, Any]) -> dict[str, Any]:
+    """Sanitize a JSON Schema dictionary for CALL-E compatibility.
+
+    CALL-E's validator rejects schemas with 'anyOf'. This helper flattens
+    any nullable/union properties to simple primitive types.
+    """
+    clean = copy.deepcopy(schema)
+    props = clean.get("properties", {})
+    for name, prop in props.items():
+        if isinstance(prop, dict) and "anyOf" in prop:
+            types = [
+                x.get("type")
+                for x in prop["anyOf"]
+                if isinstance(x, dict) and x.get("type") and x.get("type") != "null"
+            ]
+            prop["type"] = types[0] if types else "string"
+            del prop["anyOf"]
+            if prop.get("default") is None:
+                prop.pop("default", None)
+    return clean
+
+
+# Default strict and sanitized JSON Schema for CALL-E
+CALLE_TRIAGE_RESULT_JSON_SCHEMA = sanitize_json_schema_for_calle(
+    CallETriageStructuredResult.model_json_schema()
+)

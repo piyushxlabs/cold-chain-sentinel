@@ -41,13 +41,19 @@ def build_triage_task_instructions(state: SentinelState) -> str:
     nearest_hub = sanitize_interpolated_text(str(state.get("nearest_verified_cold_hub", "nearest cold hub")))
 
     return (
-        f"interrogate commercial driver {driver_name} regarding reefer temperature excursion on truck {truck_id}, trailer {trailer_id}. "
-        f"Current reefer temp is {current_temp}F (setpoint: {setpoint}F, alarm code: {alarm_code}). "
-        f"Ask the driver: 1) Are they parked safely? 2) Is the reefer engine running? 3) Is the return air bulkhead obstructed? "
-        f"4) Is there visible cargo sweating or frost on evaporator coils? 5) Does the reefer unit display any specific error codes? "
-        f"6) What is their remaining FMCSA HOS driving minutes? "
-        f"Offer options to divert {nearest_hub} or pull over for roadside service. "
-        f"Prohibit DIY repairs, do not discuss claims or settlements, and check if an active emergency exists."
+        f"speak with commercial driver {driver_name} regarding a critical reefer temperature excursion on truck {truck_id}, trailer {trailer_id}. "
+        f"Current reefer temp is {current_temp}F with setpoint {setpoint}F (telematics alarm: {alarm_code}). "
+        f"You must ask the driver: "
+        f"1. Are they parked in a safe location? "
+        f"2. Is the reefer diesel engine running? "
+        f"3. Is the return air bulkhead clear or obstructed? "
+        f"4. Is there visible cargo sweating or frost on evaporator coils? "
+        f"5. Does the reefer display any active alarm codes? "
+        f"6. How many FMCSA driving hours/minutes remain on their electronic logbook? "
+        f"7. Does an active emergency (fire, collision, medical) exist? "
+        f"Offer options to divert to {nearest_hub} or request roadside service, and record their agreed choice. "
+        f"Prohibit DIY mechanical repairs and do not discuss cargo claims. "
+        f"On completion, record their responses in the structured result. If the call cannot be completed, record the failure reason."
     )
 
 

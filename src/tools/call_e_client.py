@@ -6,14 +6,17 @@ Authoritative specification: DOCS/AGENT_LOGIC_SPEC.md Section 4, DOCS/read.md, D
 from __future__ import annotations
 
 import asyncio
+import copy
 import os
 from typing import Any, Optional
 
 from src.state.exceptions import CallEAttemptExhaustedError, StateValidationError
 from src.tools.schemas.call_e_initiate_triage import (
+    CALLE_TRIAGE_RESULT_JSON_SCHEMA,
     CallETriageInput,
     CallETriageOutput,
     CallETriageStructuredResult,
+    sanitize_json_schema_for_calle,
 )
 from src.utils.sanitization import sanitize_interpolated_text, validate_e164_phone
 
@@ -28,8 +31,10 @@ class MockCalleClient:
     async def create_and_wait(
         self,
         task: str,
-        result_schema: dict[str, Any],
+        result_schema: Optional[dict[str, Any]] = None,
+        recipient_result_schema: Optional[dict[str, Any]] = None,
         recipient: Optional[dict[str, Any]] = None,
+        recipients: Optional[list[dict[str, Any]]] = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """Simulate realistic CALL-E telephone conversation turnaround."""
@@ -85,6 +90,7 @@ async def call_e_initiate_triage(input_data: CallETriageInput) -> CallETriageOut
     - Phone-prefixed task formatting: 'Call {phone} and {task}'
     - Zero-Redial policy (single attempt, no retry)
     - Defensive confidence score extraction
+    - Sanitized, anyOf-free JSON schema for CALL-E compatibility
     """
     if not validate_e164_phone(input_data.recipient_phone_e164):
         raise StateValidationError(
@@ -94,19 +100,28 @@ async def call_e_initiate_triage(input_data: CallETriageInput) -> CallETriageOut
     client_mode = os.getenv("CLIENT_MODE", "mock").lower().strip()
     formatted_task = format_calle_task(input_data.recipient_phone_e164, input_data.task_instructions)
 
-    if input_data.recipient:
-        recipient_payload = {
-            "phone": input_data.recipient.phone,
-            "region": input_data.recipient.region,
-            "locale": input_data.recipient.locale,
-        }
+    # Sanitize schema for CALL-E validator compatibility
+    raw_schema = input_data.result_schema
+    if hasattr(raw_schema, "model_dump"):
+        schema_dict = raw_schema.model_dump(mode="json")
+    elif hasattr(raw_schema, "model_json_schema"):
+        schema_dict = raw_schema.model_json_schema()
+    elif isinstance(raw_schema, dict):
+        schema_dict = copy.deepcopy(raw_schema)
     else:
-        derived_region = "IN" if input_data.recipient_phone_e164.startswith("+91") else "US"
-        recipient_payload = {
-            "phone": input_data.recipient_phone_e164,
-            "region": derived_region,
-            "locale": input_data.driver_locale,
-        }
+        schema_dict = copy.deepcopy(CALLE_TRIAGE_RESULT_JSON_SCHEMA)
+
+    clean_schema = sanitize_json_schema_for_calle(schema_dict)
+
+    phone_number = input_data.recipient.phone if input_data.recipient else input_data.recipient_phone_e164
+    derived_region = input_data.recipient.region if input_data.recipient else ("IN" if phone_number.startswith("+91") else "US")
+    locale = input_data.recipient.locale if input_data.recipient else input_data.driver_locale
+
+    recipient_payload = {
+        "phones": [phone_number],
+        "region": derived_region,
+        "locale": locale,
+    }
 
     if client_mode == "live":
         try:
@@ -122,8 +137,8 @@ async def call_e_initiate_triage(input_data: CallETriageInput) -> CallETriageOut
             raw_response = await asyncio.to_thread(
                 client.calls.create_and_wait,
                 task=formatted_task,
-                result_schema=input_data.result_schema,
                 recipient=recipient_payload,
+                recipient_result_schema=clean_schema,
             )
         except Exception as e:
             return CallETriageOutput(
@@ -136,8 +151,9 @@ async def call_e_initiate_triage(input_data: CallETriageInput) -> CallETriageOut
         mock_client = MockCalleClient()
         raw_response = await mock_client.create_and_wait(
             task=formatted_task,
-            result_schema=input_data.result_schema,
             recipient=recipient_payload,
+            recipient_result_schema=clean_schema,
+            result_schema=clean_schema,
         )
 
     # Defensively parse output
@@ -149,9 +165,15 @@ async def call_e_initiate_triage(input_data: CallETriageInput) -> CallETriageOut
     conf_score = extract_confidence_score(raw_response.get("completion_confidence", 0.0))
 
     structured_res = None
-    if raw_response.get("structured_result"):
+    sr_data = raw_response.get("structured_result")
+    if not sr_data and raw_response.get("recipients"):
+        recipients = raw_response["recipients"]
+        if isinstance(recipients, list) and len(recipients) > 0 and isinstance(recipients[0], dict):
+            sr_data = recipients[0].get("structured_result")
+
+    if sr_data:
         try:
-            structured_res = CallETriageStructuredResult.model_validate(raw_response["structured_result"])
+            structured_res = CallETriageStructuredResult.model_validate(sr_data)
         except Exception as err:
             resolved_call_id = raw_response.get("call_id") or raw_response.get("id")
             return CallETriageOutput(
@@ -162,6 +184,19 @@ async def call_e_initiate_triage(input_data: CallETriageInput) -> CallETriageOut
                 error=f"Malformed structured result schema: {str(err)}",
             )
 
+    raw_evidence = raw_response.get("evidence", {})
+    if isinstance(raw_evidence, list):
+        evidence_dict = {
+            "notes": raw_evidence,
+            "transcript_or_evidence_ref": " ".join(str(x) for x in raw_evidence),
+        }
+    elif isinstance(raw_evidence, dict):
+        evidence_dict = raw_evidence
+    elif isinstance(raw_evidence, str):
+        evidence_dict = {"transcript_or_evidence_ref": raw_evidence}
+    else:
+        evidence_dict = {}
+
     resolved_call_id = raw_response.get("call_id") or raw_response.get("id")
     return CallETriageOutput(
         call_id=resolved_call_id,
@@ -169,6 +204,6 @@ async def call_e_initiate_triage(input_data: CallETriageInput) -> CallETriageOut
         task_completed=task_completed,
         completion_confidence=conf_score,
         structured_result=structured_res,
-        evidence=raw_response.get("evidence", {}),
+        evidence=evidence_dict,
         error=raw_response.get("error"),
     )

@@ -113,6 +113,26 @@ class CallETriageOutput(BaseModel):
 # 2. Standalone Telephony Execution Primitive
 # ==============================================================================
 
+def sanitize_json_schema_for_calle(schema: Dict[str, Any]) -> Dict[str, Any]:
+    """Sanitize a JSON Schema dictionary for CALL-E compatibility."""
+    import copy
+
+    clean = copy.deepcopy(schema)
+    props = clean.get("properties", {})
+    for name, prop in props.items():
+        if isinstance(prop, dict) and "anyOf" in prop:
+            types = [
+                x.get("type")
+                for x in prop["anyOf"]
+                if isinstance(x, dict) and x.get("type") and x.get("type") != "null"
+            ]
+            prop["type"] = types[0] if types else "string"
+            del prop["anyOf"]
+            if prop.get("default") is None:
+                prop.pop("default", None)
+    return clean
+
+
 def initiate_reefer_triage(
     client: Any,
     driver_phone: str,
@@ -134,35 +154,42 @@ def initiate_reefer_triage(
     2. Enforce Zero-Redial: Exactly 1 outbound call. If call fails, returns status for ops escalation.
     3. Defensively parses `completion_confidence` (accepts float or `{"score": float, "label": str}`).
     """
-    # Build prompt instructions for CALL-E voice agent
+    # Build explicit prompt instructions for CALL-E voice agent
     task_prompt = (
-        f"Call {driver_phone} and speak with driver {driver_name} regarding reefer trailer {trailer_id} "
-        f"(attached to truck {truck_id}).\n\n"
+        f"Call {driver_phone} and speak with commercial driver {driver_name} regarding a critical reefer temperature excursion on truck {truck_id}, trailer {trailer_id}.\n\n"
         f"ALERT CONTEXT:\n"
         f"- Cargo Commodity: {commodity_type}\n"
         f"- Required Setpoint: {setpoint_temp_f:.1f}°F (Target Range: {allowed_temp_range_str})\n"
         f"- Current Sensor Reading: {current_temp_f:.1f}°F (EXCURSION DETECTED)\n"
         f"- Nearest Verified Cold Hub: {nearest_cold_hub_name} ({nearest_cold_hub_eta_minutes} min drive)\n\n"
-        f"CALL SCRIPT & TRIAGE CHECKLIST:\n"
-        f"1. SAFETY CHECK: Confirm the driver is safely parked or pulled over before continuing.\n"
-        f"2. EMERGENCY CHECK: Ask if there is any active vehicle accident, cargo fire, or medical hazard. If yes, mark emergency_reported=True and advise dialing 911.\n"
-        f"3. UNIT INSPECTION: Ask if the reefer unit engine is running, if return air bulkhead is clear of obstruction, and if any alarm codes are shown on the display.\n"
-        f"4. CARGO CHECK: Ask if the driver noticed any cargo sweating or visible condensation.\n"
-        f"5. HOS VERIFICATION: Ask how many remaining driving hours/minutes they have on their electronic logbook (FMCSA HOS).\n"
-        f"6. REMEDIATION AGREEMENT: Present options: (A) Divert to {nearest_cold_hub_name}, (B) Pull over for roadside service, (C) Continue monitored if unit reset cleared alarm, or (D) Driver refusal. Record their agreed selection."
+        f"MANDATORY TRIAGE CHECKLIST & QUESTIONS TO ASK DRIVER:\n"
+        f"1. SAFETY: Confirm the driver is safely parked or pulled over before continuing.\n"
+        f"2. UNIT STATUS: Ask if the diesel reefer refrigeration unit is actively running/humming.\n"
+        f"3. AIRFLOW: Ask if the front return air bulkhead is clear or blocked by cargo/pallets.\n"
+        f"4. CARGO & COILS: Ask if they see cargo sweating, moisture on packaging, or frost/ice on evaporator coils.\n"
+        f"5. ALARM CODE: Ask if any error or alarm codes are shown on the in-cab or reefer controller display.\n"
+        f"6. HOURS OF SERVICE: Ask how many remaining driving hours or minutes they have on their electronic logbook (FMCSA HOS).\n"
+        f"7. EMERGENCY: Ask if there is any active vehicle accident, cargo fire, or road emergency (if yes, advise dialing 911).\n"
+        f"8. REMEDIATION AGREEMENT: Present options: (A) Divert to {nearest_cold_hub_name}, (B) Pull over for roadside service, (C) Continue monitored if unit reset cleared alarm, or (D) Driver refusal. Record their agreed selection.\n\n"
+        f"Prohibit DIY repairs, do not discuss freight claims or settlement value. "
+        f"On completion, record all driver responses into the structured result. If the call cannot be completed, record the failure reason."
     )
 
     try:
         derived_region = "IN" if driver_phone.startswith("+91") else "US"
         recipient_data = {
-            "phone": driver_phone,
+            "phones": [driver_phone],
             "region": derived_region,
+            "locale": "en-US",
         }
+        clean_schema = sanitize_json_schema_for_calle(
+            CallETriageStructuredResult.model_json_schema()
+        )
         # Call CALL-E SDK
         call_response = client.calls.create_and_wait(
             task=task_prompt,
-            result_schema=CallETriageStructuredResult.model_json_schema(),
             recipient=recipient_data,
+            recipient_result_schema=clean_schema,
         )
 
         # Helper to extract attributes from dict or object safely
@@ -185,6 +212,11 @@ def initiate_reefer_triage(
 
         # Parse structured result
         raw_result = get_field(call_response, "structured_result") or get_field(call_response, "result")
+        if not raw_result and get_field(call_response, "recipients"):
+            recs = get_field(call_response, "recipients")
+            if isinstance(recs, list) and len(recs) > 0 and isinstance(recs[0], dict):
+                raw_result = get_field(recs[0], "structured_result")
+
         structured_obj: Optional[CallETriageStructuredResult] = None
         if raw_result:
             if isinstance(raw_result, dict):
