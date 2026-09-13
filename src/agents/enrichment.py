@@ -31,8 +31,15 @@ async def enrichment_node(state: SentinelState) -> dict[str, Any]:
     trailer_id = state.get("trailer_id", "")
 
     phone = state.get("driver_phone_e164", "")
+    driver_name = state.get("driver_name")
 
-    tms_input = TMSLookupInput(truck_id=truck_id, trailer_id=trailer_id, event_id=event_id)
+    tms_input = TMSLookupInput(
+        truck_id=truck_id,
+        trailer_id=trailer_id,
+        event_id=event_id,
+        driver_phone_e164=phone if phone else None,
+        driver_name=driver_name if driver_name else None,
+    )
     eld_input = ELDLookupInput(truck_id=truck_id, driver_phone_e164=phone)
 
     tool_artifacts: dict[str, ToolCallResult] = {}

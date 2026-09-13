@@ -7,8 +7,11 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import logging
 import os
 from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
 
 from src.state.exceptions import CallEAttemptExhaustedError, StateValidationError
 from src.tools.schemas.call_e_initiate_triage import (
@@ -92,13 +95,18 @@ async def call_e_initiate_triage(input_data: CallETriageInput) -> CallETriageOut
     - Defensive confidence score extraction
     - Sanitized, anyOf-free JSON schema for CALL-E compatibility
     """
-    if not validate_e164_phone(input_data.recipient_phone_e164):
+    target_phone = (
+        input_data.recipient.phone
+        if (input_data.recipient and input_data.recipient.phone)
+        else input_data.recipient_phone_e164
+    )
+    if not validate_e164_phone(target_phone):
         raise StateValidationError(
-            f"Invalid recipient phone format: '{input_data.recipient_phone_e164}'. Must match strict E.164."
+            f"Invalid recipient phone format: '{target_phone}'. Must match strict E.164."
         )
 
     client_mode = os.getenv("CLIENT_MODE", "mock").lower().strip()
-    formatted_task = format_calle_task(input_data.recipient_phone_e164, input_data.task_instructions)
+    formatted_task = format_calle_task(target_phone, input_data.task_instructions)
 
     # Sanitize schema for CALL-E validator compatibility
     raw_schema = input_data.result_schema
@@ -113,15 +121,24 @@ async def call_e_initiate_triage(input_data: CallETriageInput) -> CallETriageOut
 
     clean_schema = sanitize_json_schema_for_calle(schema_dict)
 
-    phone_number = input_data.recipient.phone if input_data.recipient else input_data.recipient_phone_e164
-    derived_region = input_data.recipient.region if input_data.recipient else ("IN" if phone_number.startswith("+91") else "US")
-    locale = input_data.recipient.locale if input_data.recipient else input_data.driver_locale
+    derived_region = (
+        input_data.recipient.region
+        if (input_data.recipient and input_data.recipient.region)
+        else ("IN" if target_phone.startswith("+91") else "US")
+    )
+    locale = (
+        input_data.recipient.locale
+        if (input_data.recipient and input_data.recipient.locale)
+        else input_data.driver_locale
+    )
 
     recipient_payload = {
-        "phones": [phone_number],
+        "phones": [target_phone],
         "region": derived_region,
         "locale": locale,
     }
+
+    logger.info(f"[CALL-E Dispatch] Target phone number: {target_phone}")
 
     if client_mode == "live":
         try:

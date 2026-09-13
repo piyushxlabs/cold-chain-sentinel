@@ -8,8 +8,11 @@ Authoritative specifications:
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import logging
 import time
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from src.state.exceptions import CallEAttemptExhaustedError, StateValidationError
 from src.state.schema import (
@@ -57,6 +60,14 @@ def build_triage_task_instructions(state: SentinelState) -> str:
     )
 
 
+def is_dummy_mock_phone(phone: str | None) -> bool:
+    """Check if phone number is a fictional/dummy mock number (e.g. +12065550198 or containing 555)."""
+    if not phone:
+        return True
+    cleaned = phone.strip()
+    return cleaned == "+12065550198" or "555" in cleaned or "0000000" in cleaned
+
+
 async def call_interrogation_node(state: SentinelState) -> dict[str, Any]:
     """Execute single outbound CALL-E triage call to the commercial driver.
 
@@ -66,7 +77,7 @@ async def call_interrogation_node(state: SentinelState) -> dict[str, Any]:
     - Bound ONLY to call_e_initiate_triage
     """
     event_id = state.get("event_id", "")
-    phone = state.get("driver_phone_e164", "")
+    incoming_phone = state.get("driver_phone_e164", "")
     locale = state.get("driver_locale", "en-US")
 
     # Zero-Redial guard check
@@ -75,18 +86,40 @@ async def call_interrogation_node(state: SentinelState) -> dict[str, Any]:
             f"Zero-Redial violation: call_id '{state.get('call_id')}' already exists for event_id '{event_id}'."
         )
 
-    if not phone or not validate_e164_phone(phone):
-        raise StateValidationError(f"Call interrogation requires valid E.164 phone, got '{phone}'")
+    # Resolve target phone number:
+    # Check if TMS enrichment provided a confirmed driver phone
+    confirmed_phone = None
+    tms_artifact = state.get("tool_artifacts", {}).get("tms_lookup_driver_and_load")
+    if tms_artifact:
+        payload = tms_artifact.payload if hasattr(tms_artifact, "payload") else tms_artifact.get("payload")
+        if isinstance(payload, dict):
+            confirmed_phone = payload.get("driver_phone_e164_confirmed")
 
-    derived_region = "IN" if phone.startswith("+91") else "US"
+    # Resolution priority:
+    # If the incoming event contains an explicit driver_phone_e164 (or if driver_phone_e164_confirmed
+    # matches dummy mock patterns like +12065550198 or 555), it must use the actual incoming driver_phone_e164.
+    if incoming_phone and validate_e164_phone(incoming_phone):
+        if not confirmed_phone or is_dummy_mock_phone(confirmed_phone) or incoming_phone:
+            target_phone = incoming_phone
+    elif confirmed_phone and validate_e164_phone(confirmed_phone) and not is_dummy_mock_phone(confirmed_phone):
+        target_phone = confirmed_phone
+    else:
+        target_phone = incoming_phone
+
+    logger.info(f"[CALL-E Dispatch] Target phone number: {target_phone}")
+
+    if not target_phone or not validate_e164_phone(target_phone):
+        raise StateValidationError(f"Call interrogation requires valid E.164 phone, got '{target_phone}'")
+
+    derived_region = "IN" if target_phone.startswith("+91") else "US"
     recipient = CallERecipient(
-        phone=phone,
+        phone=target_phone,
         region=derived_region,
         locale=locale,
     )
     task_instructions = build_triage_task_instructions(state)
     call_input = CallETriageInput(
-        recipient_phone_e164=phone,
+        recipient_phone_e164=target_phone,
         driver_locale=locale,
         task_instructions=task_instructions,
         result_schema=CALLE_TRIAGE_RESULT_JSON_SCHEMA,

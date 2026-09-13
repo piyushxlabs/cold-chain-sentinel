@@ -29,6 +29,8 @@ class TMSLookupInput(BaseModel):
     truck_id: str = Field(..., description="Power unit identifier")
     trailer_id: str = Field(..., description="Reefer trailer identifier")
     event_id: str = Field(..., description="Telematics excursion event identifier")
+    driver_phone_e164: Optional[str] = Field(default=None, description="Incoming driver contact phone in E.164 format")
+    driver_name: Optional[str] = Field(default=None, description="Incoming commercial driver full name")
 
 
 class TMSLookupOutput(BaseModel):

@@ -186,6 +186,7 @@ def initiate_reefer_triage(
             CallETriageStructuredResult.model_json_schema()
         )
         # Call CALL-E SDK
+        logger.info(f"[CALL-E Dispatch] Target phone number: {driver_phone}")
         call_response = client.calls.create_and_wait(
             task=task_prompt,
             recipient=recipient_data,

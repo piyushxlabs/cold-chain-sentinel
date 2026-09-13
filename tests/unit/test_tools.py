@@ -77,7 +77,7 @@ async def test_call_e_invalid_phone_rejected():
 
 @pytest.mark.asyncio
 async def test_tms_lookup_tool():
-    """Verify tms_lookup_driver_and_load execution."""
+    """Verify tms_lookup_driver_and_load execution with fallback."""
     input_data = TMSLookupInput(
         truck_id="TRK-880",
         trailer_id="TRL-992",
@@ -86,9 +86,29 @@ async def test_tms_lookup_tool():
     output = await tms_lookup_driver_and_load(input_data)
 
     assert output.tms_verified is True
+    assert output.driver_phone_e164_confirmed == "+12065550198"
+    assert output.driver_name == "Marcus Vance"
     assert output.bol_number == "BOL-9901"
     assert output.nearest_verified_cold_hub.name == "Lincoln Cold Logistics Hub"
     assert output.nearest_verified_cold_hub.lat == 40.8136
+
+
+@pytest.mark.asyncio
+async def test_tms_lookup_tool_preserves_incoming_driver_phone():
+    """Verify tms_lookup_driver_and_load preserves valid incoming live driver phone and name."""
+    input_data = TMSLookupInput(
+        truck_id="TRK-880",
+        trailer_id="TRL-992",
+        event_id="evt_test_001",
+        driver_phone_e164="+916395536126",
+        driver_name="Ayush",
+    )
+    output = await tms_lookup_driver_and_load(input_data)
+
+    assert output.tms_verified is True
+    assert output.driver_phone_e164_confirmed == "+916395536126"
+    assert output.driver_name == "Ayush"
+    assert output.bol_number == "BOL-9901"
 
 
 @pytest.mark.asyncio

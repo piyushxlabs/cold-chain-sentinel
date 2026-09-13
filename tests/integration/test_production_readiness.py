@@ -400,3 +400,64 @@ def test_simulation_6_malformed_tool_output_pydantic_defense():
     }
     with pytest.raises(ValidationError):
         StandaloneCallETriageStructuredResult.model_validate(bad_data)
+
+
+@pytest.mark.asyncio
+async def test_driver_phone_resolution_priority_in_call_interrogation():
+    """Verify call_interrogation_node prioritizes incoming live phone over dummy mock TMS phone."""
+    from src.agents.call_interrogation import call_interrogation_node
+    from src.state.schema import ToolCallResult
+
+    live_phone = "+916395536126"
+    dummy_tms_phone = "+12065550198"
+
+    state = {
+        "event_id": "evt_phone_priority_test",
+        "driver_phone_e164": live_phone,
+        "driver_name": "Ayush",
+        "driver_locale": "en-US",
+        "truck_id": "TRK-902",
+        "trailer_id": "TRL-904",
+        "current_temp_f": -5.0,
+        "setpoint_temp_f": -20.0,
+        "tool_artifacts": {
+            "tms_lookup_driver_and_load": ToolCallResult(
+                tool_call_id="tms_001",
+                tool_name="tms_lookup_driver_and_load",
+                status="SUCCESS",
+                payload={"driver_phone_e164_confirmed": dummy_tms_phone, "driver_name": "Marcus Vance"},
+                timestamp="2026-09-13T12:00:00Z",
+                latency_ms=10.0,
+            )
+        },
+    }
+
+    captured_call_input = None
+
+    async def mock_initiate(call_input):
+        nonlocal captured_call_input
+        captured_call_input = call_input
+        return CallETriageOutput(
+            call_id="call_mock_priority_123",
+            status="completed",
+            task_completed=True,
+            completion_confidence=0.9,
+            structured_result=CallETriageStructuredResult(
+                driver_verified_safe_location=True,
+                reefer_engine_running=True,
+                air_bulkhead_obstructed=False,
+                cargo_sweating_detected=False,
+                driver_hos_minutes_remaining=60,
+                selected_option="DIVERT_TO_COLD_HUB",
+                emergency_reported=False,
+            ),
+        )
+
+    with patch("src.agents.call_interrogation.call_e_initiate_triage", side_effect=mock_initiate):
+        result = await call_interrogation_node(state)  # type: ignore
+
+    assert captured_call_input is not None
+    # Must use actual incoming driver_phone_e164, NOT the dummy 555 number
+    assert captured_call_input.recipient_phone_e164 == live_phone
+    assert captured_call_input.recipient.phone == live_phone
+    assert captured_call_input.recipient.region == "IN"
