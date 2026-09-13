@@ -112,7 +112,7 @@ async def decision_gate_node(state: SentinelState) -> dict[str, Any]:
             escalation_reasons.append("manual_override")
 
     # Gate 7: Pull Over for Roadside Service
-    elif selected_option in ["PULL_OVER_ROADSIDE_SERVICE", "PULL_OVER"]:
+    elif selected_option in ["PULL_OVER_ROADSIDE_SERVICE", "PULL_OVER", "ROADSIDE_SERVICE"]:
         agreed_action = "PULL_OVER_ROADSIDE_SERVICE"
         disposition = "AUTONOMOUSLY_SERVICED"
 
