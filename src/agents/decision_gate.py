@@ -60,29 +60,28 @@ async def decision_gate_node(state: SentinelState) -> dict[str, Any]:
     agreed_action: AgreedAction
     disposition: Disposition
 
-    # Gate 1: Active Emergency / Prior Locked Override
-    if requires_override or emergency_reported:
+    # Gate 1: Active Emergency Reported on Call
+    if emergency_reported:
         agreed_action = "ESCALATE_TO_HUMAN_DISPATCH"
         disposition = "ESCALATED_MANUAL_OVERRIDE"
         requires_override = True
-        if emergency_reported and "emergency_reported_on_call" not in escalation_reasons:
-            escalation_reasons.append("emergency_reported_on_call")
+        escalation_reasons.append("emergency_reported_on_call")
 
-    # Gate 2: Driver Refusal
+    # Gate 2: Driver Refusal / Dispute
     elif selected_option == "DRIVER_REFUSED":
         agreed_action = "DRIVER_REFUSED"
         disposition = "ESCALATED_DRIVER_REFUSAL"
         requires_override = True
         escalation_reasons.append("driver_refused_reroute")
 
-    # Gate 3: FMCSA 49 CFR Part 395 HOS Gate
+    # Gate 3: FMCSA 49 CFR Part 395 HOS Gate (< 35 min remaining)
     elif driver_hos is None or driver_hos < min_hos:
         agreed_action = "ESCALATE_TO_HUMAN_DISPATCH"
         disposition = "ESCALATED_HOS_BREACH"
         requires_override = True
         escalation_reasons.append(f"insufficient_hos_for_reroute_{driver_hos}m_lt_{min_hos}m")
 
-    # Gate 4: FSMA Biologics Cargo Sweating Spoilage Gate
+    # Gate 4: FSMA Biologics/Pharma Cargo Sweating Spoilage Gate
     elif (
         cargo
         and cargo.commodity_type in ["Biologics", "Pharma"]
@@ -104,17 +103,25 @@ async def decision_gate_node(state: SentinelState) -> dict[str, Any]:
         else:
             escalation_reasons.append("unresolved_low_confidence_review")
 
-    # Gate 6: Pull Over for Roadside Service
+    # Gate 6: Prior Locked Override (manual cancellation / upstream fault)
+    elif requires_override:
+        agreed_action = "ESCALATE_TO_HUMAN_DISPATCH"
+        disposition = "ESCALATED_MANUAL_OVERRIDE"
+        requires_override = True
+        if "manual_override" not in escalation_reasons:
+            escalation_reasons.append("manual_override")
+
+    # Gate 7: Pull Over for Roadside Service
     elif selected_option in ["PULL_OVER_ROADSIDE_SERVICE", "PULL_OVER"]:
         agreed_action = "PULL_OVER_ROADSIDE_SERVICE"
         disposition = "AUTONOMOUSLY_SERVICED"
 
-    # Gate 7: Autonomous Divert to Emergency Cold Hub
+    # Gate 8: Autonomous Divert to Emergency Cold Hub
     elif selected_option in ["DIVERT_TO_COLD_HUB", "DIVERT_TO_EMERGENCY_COLD_HUB"]:
         agreed_action = "DIVERT_TO_EMERGENCY_COLD_HUB"
         disposition = "AUTONOMOUSLY_DIVERTED"
 
-    # Gate 8: Continue Monitored Route
+    # Gate 9: Continue Monitored Route
     else:
         agreed_action = "CONTINUE_MONITORED_ROUTE"
         disposition = "AUTONOMOUSLY_RESOLVED_CONTINUE"

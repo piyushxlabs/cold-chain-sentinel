@@ -125,6 +125,8 @@ async def call_interrogation_node(state: SentinelState) -> dict[str, Any]:
             "call_id": output.call_id,
             "call_status": output.status,
             "driver_contacted": output.status == "completed",
+            "agreed_action": "ESCALATE_TO_HUMAN_DISPATCH",
+            "disposition": "ESCALATED_TELEPHONY_FAILURE",
             "tool_artifacts": tool_artifacts,
             "error_logs": error_logs,
             "escalation_reasons": escalation_reasons,

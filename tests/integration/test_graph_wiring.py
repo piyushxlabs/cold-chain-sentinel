@@ -75,21 +75,18 @@ def test_route_after_call_logic() -> None:
     """Test conditional branching after CALL-E call interrogation node."""
     state_completed: SentinelState = {
         "call_status": "completed",
-        "requires_immediate_human_override": False,
     }
     assert route_after_call(state_completed) == "compliance_review"
 
     state_no_answer: SentinelState = {
         "call_status": "no_answer",
-        "requires_immediate_human_override": False,
     }
     assert route_after_call(state_no_answer) == "escalation_failure"
 
-    state_override: SentinelState = {
-        "call_status": "completed",
-        "requires_immediate_human_override": True,
+    state_failed: SentinelState = {
+        "call_status": "failed",
     }
-    assert route_after_call(state_override) == "escalation_failure"
+    assert route_after_call(state_failed) == "escalation_failure"
 
 
 def test_route_after_decision_gate_logic() -> None:

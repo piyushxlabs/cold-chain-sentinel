@@ -71,8 +71,12 @@ async def escalation_failure_node(state: SentinelState) -> dict[str, Any]:
         },
     )
 
+    agreed_action = state.get("agreed_action") or "ESCALATE_TO_HUMAN_DISPATCH"
+    disposition = state.get("disposition") or "ESCALATED_MANUAL_OVERRIDE"
+
     return {
-        "agreed_action": "ESCALATE_TO_HUMAN_DISPATCH",
+        "agreed_action": agreed_action,
+        "disposition": disposition,
         "requires_immediate_human_override": True,
         "escalation_reasons": escalation_reasons,
         "tool_artifacts": tool_artifacts,

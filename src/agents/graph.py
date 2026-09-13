@@ -33,8 +33,9 @@ def route_after_enrichment(state: SentinelState) -> Literal["call_interrogation"
 def route_after_call(state: SentinelState) -> Literal["compliance_review", "escalation_failure"]:
     """Conditional routing edge following CALL-E driver interrogation."""
     status = state.get("call_status")
-    override = state.get("requires_immediate_human_override", False)
-    if override or status != "completed":
+    ev = state.get("call_evidence")
+    task_completed = ev.task_completed if ev is not None else True
+    if status != "completed" or not task_completed:
         return "escalation_failure"
     return "compliance_review"
 
