@@ -118,6 +118,20 @@ export default function OperationsCockpitPage() {
     }
   };
 
+  // Submit Feedback Annotation to Backend / Langfuse
+  const handleFeedback = async (scoreName: string, value: any, comment?: string) => {
+    if (!selectedEventId) return;
+    try {
+      await fetch(`${BACKEND_URL}/sessions/${selectedEventId}/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ score_name: scoreName, value, comment }),
+      });
+    } catch (err) {
+      console.error("Feedback submission error:", err);
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[#0b0f17]">
       {/* Top Cockpit Header */}
@@ -224,6 +238,7 @@ export default function OperationsCockpitPage() {
               state={state}
               nodeStatuses={nodeStatuses}
               escalationAlert={escalationAlert}
+              onFeedback={handleFeedback}
             />
           ) : (
             <div className="flex-1 overflow-y-auto p-6 bg-slate-950 font-mono text-xs text-slate-300 space-y-2">

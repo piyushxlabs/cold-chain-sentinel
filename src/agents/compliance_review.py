@@ -166,16 +166,44 @@ async def compliance_review_node(state: SentinelState) -> dict[str, Any]:
             reviewer_model=f"{primary_model}-mock",
             reasoning_summary="Per physical_observations.air_bulkhead_obstructed, airflow obstruction detected. Per call_evidence.completion_confidence, high triage certainty.",
         )
+        # Record Generation span for mock evaluation
+        from src.telemetry.tracing import trace_generation
+        trace_generation(
+            model_name=f"{primary_model}-mock",
+            event_id=state.get("event_id") or "evt_unknown",
+            prompt={"mock_state_input": True},
+            output=decision.model_dump(),
+            latency_ms=12.5,
+            provider="google",
+        )
     else:
         client = get_genai_client()
         prompt = build_evaluation_prompt(state)
+        event_id = state.get("event_id") or "evt_unknown"
 
         # Primary model pass
         decision = await execute_compliance_evaluation(client, primary_model, prompt)
 
+        from src.telemetry.tracing import trace_generation
+        trace_generation(
+            model_name=primary_model,
+            event_id=event_id,
+            prompt=prompt,
+            output=decision.model_dump(),
+            provider="google",
+        )
+
         # Escalation ladder: if confidence is medium (0.5 <= conf < 0.75), invoke fallback model pass
         if 0.5 <= decision.review_confidence < 0.75:
             fallback_decision = await execute_compliance_evaluation(client, fallback_model, prompt)
+            trace_generation(
+                model_name=fallback_model,
+                event_id=event_id,
+                prompt=prompt,
+                output=fallback_decision.model_dump(),
+                provider="google",
+                span_name="compliance_review_generation_fallback",
+            )
             decision = fallback_decision
 
         # Citation enforcement: if summary fails grounding, adjust confidence down

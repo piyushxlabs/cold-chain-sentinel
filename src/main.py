@@ -383,6 +383,14 @@ from src.ui.cancel_endpoint import (
 )
 
 
+class FeedbackPayload(BaseModel):
+    """User feedback and quality score submission payload for Langfuse."""
+    score_name: str
+    value: Any
+    comment: str | None = None
+    span_id: str | None = None
+
+
 @app.post(
     "/sessions/{event_id}/cancel",
     response_model=CancelResponsePayload,
@@ -405,5 +413,31 @@ async def cancel_session(
         active_tasks=active_tasks,
         compiled_graph=getattr(app.state, "compiled_graph", None),
     )
+
+
+from src.telemetry.feedback_annotations import create_score
+
+
+@app.post("/sessions/{event_id}/feedback", tags=["Observability"])
+@app.post("/api/sessions/{event_id}/feedback", tags=["Observability"])
+async def submit_session_feedback(
+    event_id: str,
+    payload: FeedbackPayload,
+) -> dict[str, Any]:
+    """Submit quality score and human feedback annotation to Langfuse telemetry."""
+    score_record = create_score(
+        event_id=event_id,
+        name=payload.score_name,
+        value=payload.value,
+        comment=payload.comment,
+        span_id=payload.span_id,
+    )
+    return {
+        "status": "recorded",
+        "event_id": event_id,
+        "score": score_record,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
 
 
