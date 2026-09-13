@@ -375,3 +375,35 @@ async def stream_session_events(event_id: str):
         },
     )
 
+
+from src.ui.cancel_endpoint import (
+    CancelRequestPayload,
+    CancelResponsePayload,
+    handle_session_cancellation,
+)
+
+
+@app.post(
+    "/sessions/{event_id}/cancel",
+    response_model=CancelResponsePayload,
+    tags=["Control"],
+)
+@app.post(
+    "/api/sessions/{event_id}/cancel",
+    response_model=CancelResponsePayload,
+    tags=["Control"],
+)
+async def cancel_session(
+    event_id: str,
+    payload: CancelRequestPayload | None = None,
+) -> CancelResponsePayload:
+    """Pre-actuation emergency cancellation endpoint."""
+    req_payload = payload or CancelRequestPayload(action="cancel", event_id=event_id)
+    return await handle_session_cancellation(
+        payload=req_payload,
+        session_index=session_index,
+        active_tasks=active_tasks,
+        compiled_graph=getattr(app.state, "compiled_graph", None),
+    )
+
+
