@@ -77,7 +77,19 @@ class SessionSummary(BaseModel):
     timestamp: str
 
 
+from fastapi.responses import StreamingResponse
 from langgraph.checkpoint.memory import MemorySaver
+
+from src.ui.event_types import (
+    GraphNodeTransitionEvent,
+    StreamEndEvent,
+    StreamErrorEvent,
+)
+from src.ui.stream_handler import (
+    broadcaster,
+    emit_node_execution_events,
+    stream_sse_for_session,
+)
 
 # Global session metadata index for quick operations console querying
 session_index: dict[str, dict[str, Any]] = {}
@@ -89,27 +101,64 @@ async def execute_sentinel_workflow(
     initial_state: SentinelState,
     event_id: str,
 ) -> None:
-    """Execute the compiled LangGraph StateGraph in the background."""
+    """Execute the compiled LangGraph StateGraph in the background with SSE broadcasting."""
     config = {"configurable": {"thread_id": event_id}}
+    timestamp_str = datetime.now(timezone.utc).isoformat()
     try:
         logger.info(f"Starting LangGraph execution for event_id: {event_id}")
         session_index[event_id]["status"] = "in-progress"
-        final_state = await compiled_graph.ainvoke(initial_state, config=config)
-        logger.info(
-            f"LangGraph execution finished for event_id: {event_id} with disposition: {final_state.get('disposition')}"
+
+        # Emit initial ingress entry event
+        await broadcaster.publish(
+            event_id,
+            GraphNodeTransitionEvent(
+                node="ingress",
+                status="in-progress",
+                timestamp=timestamp_str,
+            ),
         )
+
+        # Stream node updates granularly through LangGraph StateGraph
+        async for update in compiled_graph.astream(
+            initial_state, config=config, stream_mode="updates"
+        ):
+            if isinstance(update, dict):
+                for node_name, node_output in update.items():
+                    if isinstance(node_output, dict):
+                        await emit_node_execution_events(event_id, node_name, node_output)
+
+        # Fetch final state snapshot from checkpointer
+        state_snapshot = await compiled_graph.aget_state(config)
+        final_state = state_snapshot.values if state_snapshot and state_snapshot.values else {}
+
+        disposition = final_state.get("disposition")
+        override = final_state.get("requires_immediate_human_override", False)
+        logger.info(
+            f"LangGraph execution finished for event_id: {event_id} with disposition: {disposition}"
+        )
+
         if event_id in session_index:
             session_index[event_id]["status"] = "completed"
-            session_index[event_id]["disposition"] = final_state.get("disposition")
-            session_index[event_id]["override_required"] = final_state.get(
-                "requires_immediate_human_override", False
-            )
+            session_index[event_id]["disposition"] = disposition
+            session_index[event_id]["override_required"] = override
             session_index[event_id]["final_state"] = final_state
+
+        # Emit terminal stream-end event
+        await broadcaster.publish(
+            event_id,
+            StreamEndEvent(reason="success" if not override else "error"),
+        )
     except Exception as exc:
         logger.error(f"Error executing LangGraph for event_id: {event_id}: {exc}", exc_info=True)
         if event_id in session_index:
             session_index[event_id]["status"] = "failed"
             session_index[event_id]["override_required"] = True
+
+        await broadcaster.publish(
+            event_id,
+            StreamErrorEvent(code="WORKFLOW_ERROR", message=str(exc), recoverable=False),
+        )
+        await broadcaster.publish(event_id, StreamEndEvent(reason="error"))
 
 
 @asynccontextmanager
@@ -310,3 +359,19 @@ async def get_session_state(event_id: str) -> dict[str, Any]:
         status_code=status.HTTP_404_NOT_FOUND,
         detail=f"Excursion session with event_id '{event_id}' not found",
     )
+
+
+@app.get("/sessions/{event_id}/stream", tags=["Streaming"])
+@app.get("/api/sessions/{event_id}/stream", tags=["Streaming"])
+async def stream_session_events(event_id: str):
+    """Server-Sent Events (SSE) live data stream endpoint for the incident timeline."""
+    return StreamingResponse(
+        stream_sse_for_session(event_id),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
