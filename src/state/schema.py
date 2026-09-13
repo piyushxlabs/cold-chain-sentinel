@@ -6,10 +6,18 @@ Authoritative specification: DOCS/AGENT_ORCHESTRATION_BLUEPRINT.md Section 3.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from typing_extensions import TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from src.state.reducers import (
+    reduce_append_list,
+    reduce_immutable,
+    reduce_last_write_wins,
+    reduce_merge_dict,
+    reduce_monotonic_or,
+)
 
 
 class Coordinates(BaseModel):
@@ -153,54 +161,54 @@ class SentinelState(TypedDict, total=False):
     """LangGraph StateGraph typed dictionary representation for Cold Chain Sentinel."""
 
     # Entry fields (immutable-after-init)
-    event_id: str
-    session_id: str
-    timestamp: str | datetime
-    truck_id: str
-    trailer_id: str
-    current_temp_f: float
-    setpoint_temp_f: float
-    temp_differential_f: float
-    duration_minutes: int
-    telematics_alarm_code: str
-    current_coordinates: Coordinates
-    target_destination: str
-    origin: str
-    cargo_manifest: CargoManifest
-    driver_phone_e164: str
-    driver_name: str
-    driver_locale: str
+    event_id: Annotated[str, reduce_immutable]
+    session_id: Annotated[str, reduce_immutable]
+    timestamp: Annotated[str | datetime, reduce_immutable]
+    truck_id: Annotated[str, reduce_immutable]
+    trailer_id: Annotated[str, reduce_immutable]
+    current_temp_f: Annotated[float, reduce_immutable]
+    setpoint_temp_f: Annotated[float, reduce_immutable]
+    temp_differential_f: Annotated[float, reduce_immutable]
+    duration_minutes: Annotated[int, reduce_immutable]
+    telematics_alarm_code: Annotated[str, reduce_immutable]
+    current_coordinates: Annotated[Coordinates, reduce_immutable]
+    target_destination: Annotated[str, reduce_immutable]
+    origin: Annotated[str, reduce_immutable]
+    cargo_manifest: Annotated[CargoManifest, reduce_immutable]
+    driver_phone_e164: Annotated[str, reduce_immutable]
+    driver_name: Annotated[str, reduce_immutable]
+    driver_locale: Annotated[str, reduce_immutable]
 
-    # Enrichment fields (written by enrichment node)
-    tms_verified: bool
-    eld_hos_minutes_at_dispatch: int | None
-    nearest_verified_cold_hub: str | None
+    # Enrichment fields (written by enrichment node - last-write-wins)
+    tms_verified: Annotated[bool, reduce_last_write_wins]
+    eld_hos_minutes_at_dispatch: Annotated[int | None, reduce_last_write_wins]
+    nearest_verified_cold_hub: Annotated[str | None, reduce_last_write_wins]
 
-    # Call session fields (written by call_interrogation node)
-    call_id: str | None
-    call_status: Literal["completed", "busy", "no_answer", "failed", "pending"] | None
-    driver_contacted: bool
-    driver_reported_alarm_code: str | None
-    physical_observations: PhysicalObservations | None
-    driver_hos_minutes_remaining: int | None
-    call_evidence: CallEvidence | None
+    # Call session fields (written by call_interrogation node - last-write-wins)
+    call_id: Annotated[str | None, reduce_last_write_wins]
+    call_status: Annotated[Literal["completed", "busy", "no_answer", "failed", "pending"] | None, reduce_last_write_wins]
+    driver_contacted: Annotated[bool, reduce_last_write_wins]
+    driver_reported_alarm_code: Annotated[str | None, reduce_last_write_wins]
+    physical_observations: Annotated[PhysicalObservations | None, reduce_last_write_wins]
+    driver_hos_minutes_remaining: Annotated[int | None, reduce_last_write_wins]
+    call_evidence: Annotated[CallEvidence | None, reduce_last_write_wins]
 
-    # Compliance review fields (written by compliance_review node)
-    compliance_review: ComplianceReview | None
+    # Compliance review fields (written by compliance_review node - last-write-wins)
+    compliance_review: Annotated[ComplianceReview | None, reduce_last_write_wins]
 
     # Decision fields (written by decision_gate node)
-    agreed_action: AgreedAction | None
-    disposition: Disposition | None
-    requires_immediate_human_override: bool
-    escalation_reasons: list[str]
+    agreed_action: Annotated[AgreedAction | None, reduce_last_write_wins]
+    disposition: Annotated[Disposition | None, reduce_last_write_wins]
+    requires_immediate_human_override: Annotated[bool, reduce_monotonic_or]
+    escalation_reasons: Annotated[list[str], reduce_append_list]
 
     # Cross-cutting fields (written across nodes)
-    audit_trail: list[AuditEvent]
-    error_logs: list[ErrorRecord]
-    tool_artifacts: dict[str, ToolCallResult]
+    audit_trail: Annotated[list[AuditEvent], reduce_append_list]
+    error_logs: Annotated[list[ErrorRecord], reduce_append_list]
+    tool_artifacts: Annotated[dict[str, ToolCallResult], reduce_merge_dict]
 
     # Terminal deliverable fields (assembled by persistence_audit node)
-    execution_timestamp: datetime | None
+    execution_timestamp: Annotated[datetime | None, reduce_last_write_wins]
 
     # Config (immutable-after-init)
-    config: RuntimeConfig
+    config: Annotated[RuntimeConfig, reduce_immutable]
