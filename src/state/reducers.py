@@ -15,12 +15,13 @@ T = TypeVar("T")
 def reduce_immutable(current_val: T | None, new_val: T | None) -> T | None:
     """Reducer: immutable-after-init.
 
-    Allows initialization from None to a value. Once set, any attempt to overwrite
-    with a differing value raises StateValidationError to preserve audit integrity.
+    Allows initialization from None or empty uninitialized default channel to a value.
+    Once set, any attempt to overwrite with a differing value raises StateValidationError
+    to preserve audit integrity.
     """
-    if current_val is None:
+    if current_val is None or current_val == "":
         return new_val
-    if new_val is None:
+    if new_val is None or new_val == "":
         return current_val
     if current_val != new_val:
         raise StateValidationError(
