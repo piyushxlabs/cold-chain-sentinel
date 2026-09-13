@@ -119,6 +119,46 @@ def test_skill_standalone_execution():
     assert call_args["task"].startswith("Call +12065550198 and speak with driver Elena Rostova")
 
 
+def test_skill_standalone_execution_dict_response():
+    """Verify initiate_reefer_triage handles raw dictionary responses from real calle SDK."""
+    mock_calle = MagicMock()
+    mock_calle.calls.create_and_wait.return_value = {
+        "id": "calle_skill_dict_001",
+        "status": "completed",
+        "task_completed": True,
+        "completion_confidence": {"score": 0.96, "label": "HIGH"},
+        "structured_result": {
+            "driver_verified_safe_location": True,
+            "reefer_engine_running": True,
+            "air_bulkhead_obstructed": False,
+            "cargo_sweating_detected": False,
+            "driver_reported_alarm_code": "ALARM 18",
+            "driver_hos_minutes_remaining": 45,
+            "selected_option": "DIVERT_TO_COLD_HUB",
+            "emergency_reported": False,
+        },
+        "evidence": {"transcript": "Call completed successfully."},
+    }
+
+    output = initiate_reefer_triage(
+        client=mock_calle,
+        driver_phone="+12065550198",
+        driver_name="Elena Rostova",
+        truck_id="TRK-100",
+        trailer_id="TRL-200",
+        current_temp_f=38.0,
+        setpoint_temp_f=34.0,
+        nearest_cold_hub_name="Test Cold Hub",
+        nearest_cold_hub_eta_minutes=15,
+    )
+
+    assert output.task_completed is True
+    assert output.status == "completed"
+    assert output.call_id == "calle_skill_dict_001"
+    assert output.completion_confidence == 0.96
+    assert output.structured_result is not None
+
+
 # ==============================================================================
 # 2. Live Environment & Endpoint Preservation Tests
 # ==============================================================================

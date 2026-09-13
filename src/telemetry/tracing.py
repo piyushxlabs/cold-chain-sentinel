@@ -7,11 +7,14 @@ Authoritative specifications:
 
 from __future__ import annotations
 
+import logging
 import os
 import time
 from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime, timezone
 from typing import Any, AsyncGenerator, Generator
+
+logger = logging.getLogger("cold_chain_sentinel.tracing")
 
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
@@ -242,8 +245,8 @@ def trace_generation(
                 input=gen_record["prompt"],
                 output=gen_record["output"],
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(f"Langfuse generation event export failed: {exc}")
 
     session_data["generations"].append(gen_record)
     return gen_record

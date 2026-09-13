@@ -25,9 +25,9 @@ export const SessionSummaryPanel: React.FC<SessionSummaryPanelProps> = ({
   }
 
   const manifest = state.cargo_manifest;
-  const currentTemp = state.current_temp_f ?? 38.5;
-  const setpointTemp = state.setpoint_temp_f ?? 34.0;
-  const delta = (currentTemp - setpointTemp).toFixed(1);
+  const currentTemp = state.current_temp_f;
+  const setpointTemp = state.setpoint_temp_f;
+  const delta = currentTemp !== undefined && setpointTemp !== undefined ? (currentTemp - setpointTemp).toFixed(1) : null;
 
   return (
     <aside className="w-full lg:w-80 flex flex-col bg-slate-900/70 border-l border-slate-800 p-5 space-y-5 overflow-y-auto">
@@ -38,18 +38,22 @@ export const SessionSummaryPanel: React.FC<SessionSummaryPanelProps> = ({
             <Thermometer className="w-4 h-4 text-rose-400" /> Temperature Telematics
           </span>
           <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-rose-950 border border-rose-800 text-rose-300 font-bold">
-            +{delta}°F EXCURSION
+            {delta !== null ? `+${delta}°F EXCURSION` : "MONITORING"}
           </span>
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-center">
           <div className="p-2 rounded bg-slate-900 border border-slate-800">
             <span className="text-[10px] text-slate-400 block">Current Reefer</span>
-            <span className="text-base font-extrabold text-rose-400 font-mono">{currentTemp}°F</span>
+            <span className="text-base font-extrabold text-rose-400 font-mono">
+              {currentTemp !== undefined && currentTemp !== null ? `${currentTemp}°F` : "—"}
+            </span>
           </div>
           <div className="p-2 rounded bg-slate-900 border border-slate-800">
             <span className="text-[10px] text-slate-400 block">Target Setpoint</span>
-            <span className="text-base font-extrabold text-teal-400 font-mono">{setpointTemp}°F</span>
+            <span className="text-base font-extrabold text-teal-400 font-mono">
+              {setpointTemp !== undefined && setpointTemp !== null ? `${setpointTemp}°F` : "—"}
+            </span>
           </div>
         </div>
 
@@ -70,20 +74,20 @@ export const SessionSummaryPanel: React.FC<SessionSummaryPanelProps> = ({
           <div className="flex items-center justify-between">
             <span className="text-slate-400">Tractor / Trailer:</span>
             <span className="font-mono font-semibold text-slate-200">
-              {state.truck_id} / {state.trailer_id}
+              {state.truck_id || "—"} / {state.trailer_id || "—"}
             </span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-slate-400">Commercial Driver:</span>
-            <span className="font-semibold text-slate-200">{state.driver_name || "Marcus Vance"}</span>
+            <span className="font-semibold text-slate-200">{state.driver_name || "—"}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-slate-400">Driver Phone:</span>
-            <span className="font-mono text-slate-300">{state.driver_phone_e164 || "+12065550198"}</span>
+            <span className="font-mono text-slate-300">{state.driver_phone_e164 || "—"}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-slate-400">Spoken Locale:</span>
-            <span className="font-mono text-slate-300">{state.driver_locale || "en-US"}</span>
+            <span className="font-mono text-slate-300">{state.driver_locale || "—"}</span>
           </div>
         </div>
       </div>

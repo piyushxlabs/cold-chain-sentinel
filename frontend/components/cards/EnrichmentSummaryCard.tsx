@@ -42,7 +42,7 @@ export const EnrichmentSummaryCard: React.FC<EnrichmentSummaryCardProps> = ({
             <MapPin className="w-3 h-3 text-cyan-400" /> Verified Emergency Cold Hub
           </span>
           <span className="font-semibold text-slate-200 block truncate">
-            {coldHub || "Lincoln Cold Storage (18m drive)"}
+            {coldHub || "Pending enrichment..."}
           </span>
         </div>
 
@@ -51,7 +51,7 @@ export const EnrichmentSummaryCard: React.FC<EnrichmentSummaryCardProps> = ({
             <Clock className="w-3 h-3 text-cyan-400" /> ELD Telematics HOS at Dispatch
           </span>
           <span className="font-semibold text-slate-200 block font-mono">
-            {eldHosMinutes !== undefined && eldHosMinutes !== null ? `${eldHosMinutes} Minutes Remaining` : "52 Minutes"}
+            {eldHosMinutes !== undefined && eldHosMinutes !== null ? `${eldHosMinutes} Minutes Remaining` : "Pending ELD query..."}
           </span>
         </div>
       </div>

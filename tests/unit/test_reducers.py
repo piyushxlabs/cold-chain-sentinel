@@ -56,6 +56,14 @@ def test_immutable_after_init():
     with pytest.raises(StateValidationError):
         reduce_immutable("+12065550198", "+12065559999")
 
+    # 0 and 0.0 are valid initial values and cannot be mutated
+    assert reduce_immutable(None, 0.0) == 0.0
+    assert reduce_immutable(None, 0) == 0
+    with pytest.raises(StateValidationError):
+        reduce_immutable(0.0, 5.0)
+    with pytest.raises(StateValidationError):
+        reduce_immutable(0, 10)
+
 
 def test_append_list():
     """Verify append-only reducer accumulates history without dropping records."""

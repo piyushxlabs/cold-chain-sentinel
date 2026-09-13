@@ -8,6 +8,7 @@ Authoritative specifications:
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import os
 from typing import Any
 
 from src.state.exceptions import StateValidationError
@@ -43,9 +44,10 @@ async def ingress_node(state: SentinelState) -> dict[str, Any]:
     # Initialize runtime config if not already provided
     config = state.get("config")
     if not config:
+        client_mode = os.getenv("CLIENT_MODE", "mock").lower().strip()
         config = RuntimeConfig(
             trace_id=f"trc_{event_id}",
-            client_mode="mock",
+            client_mode="live" if client_mode == "live" else "mock",
             max_tool_retry_attempts=3,
             min_hos_minutes_for_reroute=35,
         )

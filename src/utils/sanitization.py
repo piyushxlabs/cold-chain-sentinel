@@ -9,7 +9,7 @@ import re
 
 from src.state.exceptions import StateValidationError
 
-E164_REGEX = re.compile(r"^\+[1-9]\d{1,14}$")
+E164_REGEX = re.compile(r"^\+[1-9]\d{7,14}$")
 IDENTIFIER_REGEX = re.compile(r"^[a-zA-Z0-9_\-\.]+$")
 
 INJECTION_PATTERNS = [

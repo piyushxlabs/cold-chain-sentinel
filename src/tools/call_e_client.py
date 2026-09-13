@@ -135,16 +135,18 @@ async def call_e_initiate_triage(input_data: CallETriageInput) -> CallETriageOut
         try:
             structured_res = CallETriageStructuredResult.model_validate(raw_response["structured_result"])
         except Exception as err:
+            resolved_call_id = raw_response.get("call_id") or raw_response.get("id")
             return CallETriageOutput(
-                call_id=raw_response.get("call_id"),
+                call_id=resolved_call_id,
                 status="failed",
                 task_completed=False,
                 completion_confidence=conf_score,
                 error=f"Malformed structured result schema: {str(err)}",
             )
 
+    resolved_call_id = raw_response.get("call_id") or raw_response.get("id")
     return CallETriageOutput(
-        call_id=raw_response.get("call_id"),
+        call_id=resolved_call_id,
         status=status,  # type: ignore
         task_completed=task_completed,
         completion_confidence=conf_score,

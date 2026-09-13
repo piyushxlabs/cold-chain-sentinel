@@ -1,6 +1,7 @@
 ---
 name: cold-chain-reefer-triage
 description: Autonomous voice telephony triage agent for refrigerated transport temperature excursions. Calls commercial truck drivers, executes a standardized mechanical and cargo physical checklist, assesses HOS availability, and captures structured remediation intent.
+license: MIT
 ---
 
 # Cold Chain Reefer Triage Agent

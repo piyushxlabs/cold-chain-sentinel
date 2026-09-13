@@ -149,12 +149,18 @@ def initiate_reefer_triage(
             result_schema=CallETriageStructuredResult.model_json_schema(),
         )
 
-        # Extract call attributes safely
-        call_id = getattr(call_response, "id", None) or getattr(call_response, "call_id", None)
-        raw_status = str(getattr(call_response, "status", "failed")).lower()
+        # Helper to extract attributes from dict or object safely
+        def get_field(obj: Any, key: str, default: Any = None) -> Any:
+            if isinstance(obj, dict):
+                return obj.get(key, default)
+            return getattr(obj, key, default)
+
+        # Extract call attributes safely supporting both dict and object responses
+        call_id = get_field(call_response, "id") or get_field(call_response, "call_id")
+        raw_status = str(get_field(call_response, "status", "failed")).lower()
 
         # Parse confidence defensively
-        raw_confidence = getattr(call_response, "completion_confidence", 0.0)
+        raw_confidence = get_field(call_response, "completion_confidence", 0.0)
         confidence_val: float = 0.0
         if isinstance(raw_confidence, dict):
             confidence_val = float(raw_confidence.get("score", 0.0))
@@ -162,7 +168,7 @@ def initiate_reefer_triage(
             confidence_val = float(raw_confidence)
 
         # Parse structured result
-        raw_result = getattr(call_response, "structured_result", None) or getattr(call_response, "result", None)
+        raw_result = get_field(call_response, "structured_result") or get_field(call_response, "result")
         structured_obj: Optional[CallETriageStructuredResult] = None
         if raw_result:
             if isinstance(raw_result, dict):
@@ -172,11 +178,11 @@ def initiate_reefer_triage(
 
         # Extract evidence transcript reference
         evidence_dict: Dict[str, Any] = {}
-        raw_evidence = getattr(call_response, "evidence", None)
+        raw_evidence = get_field(call_response, "evidence")
         if isinstance(raw_evidence, dict):
             evidence_dict = raw_evidence
         else:
-            transcript = getattr(call_response, "transcript", None)
+            transcript = get_field(call_response, "transcript")
             if transcript:
                 evidence_dict = {"transcript": transcript}
 
