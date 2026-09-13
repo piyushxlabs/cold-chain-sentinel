@@ -67,7 +67,7 @@ class ComplianceReview(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    claim_risk_level: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"] = Field(
+    claim_risk_level: Literal["LOW", "MODERATE", "HIGH"] = Field(
         ..., description="Assessed risk of cargo damage or liability"
     )
     review_confidence: float = Field(..., ge=0.0, le=1.0, description="Model evaluation confidence score")
