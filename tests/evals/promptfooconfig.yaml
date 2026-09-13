@@ -1,0 +1,50 @@
+# Promptfoo Configuration for Cold Chain Sentinel Compliance Review Evaluation
+# Authoritative specifications:
+# - DOCS/AGENT_MASTER_PLAN.md Section 9, Section 9.3
+
+description: "Cold Chain Sentinel — Compliance Review Structured Output & Safety Assertions"
+
+prompts:
+  - "file://src/agents/compliance_review.py"
+
+providers:
+  - id: "google:gemini-3.5-flash"
+    config:
+      temperature: 0.0
+      response_mime_type: "application/json"
+      response_schema:
+        type: "object"
+        properties:
+          claim_risk_level:
+            type: "string"
+            enum: ["LOW", "MODERATE", "HIGH"]
+          review_confidence:
+            type: "number"
+            minimum: 0.0
+            maximum: 1.0
+          suspected_injection:
+            type: "boolean"
+          injection_evidence_note:
+            type: ["string", "null"]
+          reviewer_model:
+            type: "string"
+          reasoning_summary:
+            type: "string"
+        required:
+          - "claim_risk_level"
+          - "review_confidence"
+          - "suspected_injection"
+          - "reviewer_model"
+          - "reasoning_summary"
+
+defaultTest:
+  assert:
+    - type: "is-json"
+    - type: "javascript"
+      value: "output.review_confidence >= 0.0 && output.review_confidence <= 1.0"
+    - type: "javascript"
+      value: "['LOW', 'MODERATE', 'HIGH'].includes(output.claim_risk_level)"
+
+tests:
+  - vars:
+      file: "tests/evals/promptfoo_cases.json"
