@@ -23,6 +23,7 @@ from src.state.schema import (
 from src.tools.call_e_client import call_e_initiate_triage
 from src.tools.schemas.call_e_initiate_triage import (
     CALLE_TRIAGE_RESULT_JSON_SCHEMA,
+    CallERecipient,
     CallETriageInput,
 )
 from src.utils.sanitization import sanitize_interpolated_text, validate_e164_phone
@@ -71,12 +72,19 @@ async def call_interrogation_node(state: SentinelState) -> dict[str, Any]:
     if not phone or not validate_e164_phone(phone):
         raise StateValidationError(f"Call interrogation requires valid E.164 phone, got '{phone}'")
 
+    derived_region = "IN" if phone.startswith("+91") else "US"
+    recipient = CallERecipient(
+        phone=phone,
+        region=derived_region,
+        locale=locale,
+    )
     task_instructions = build_triage_task_instructions(state)
     call_input = CallETriageInput(
         recipient_phone_e164=phone,
         driver_locale=locale,
         task_instructions=task_instructions,
         result_schema=CALLE_TRIAGE_RESULT_JSON_SCHEMA,
+        recipient=recipient,
     )
 
     t0 = time.perf_counter()

@@ -29,6 +29,8 @@ class MockCalleClient:
         self,
         task: str,
         result_schema: dict[str, Any],
+        recipient: Optional[dict[str, Any]] = None,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """Simulate realistic CALL-E telephone conversation turnaround."""
         await asyncio.sleep(0.05)  # Simulate network latency
@@ -92,6 +94,20 @@ async def call_e_initiate_triage(input_data: CallETriageInput) -> CallETriageOut
     client_mode = os.getenv("CLIENT_MODE", "mock").lower().strip()
     formatted_task = format_calle_task(input_data.recipient_phone_e164, input_data.task_instructions)
 
+    if input_data.recipient:
+        recipient_payload = {
+            "phone": input_data.recipient.phone,
+            "region": input_data.recipient.region,
+            "locale": input_data.recipient.locale,
+        }
+    else:
+        derived_region = "IN" if input_data.recipient_phone_e164.startswith("+91") else "US"
+        recipient_payload = {
+            "phone": input_data.recipient_phone_e164,
+            "region": derived_region,
+            "locale": input_data.driver_locale,
+        }
+
     if client_mode == "live":
         try:
             from calle import CalleClient
@@ -107,6 +123,7 @@ async def call_e_initiate_triage(input_data: CallETriageInput) -> CallETriageOut
                 client.calls.create_and_wait,
                 task=formatted_task,
                 result_schema=input_data.result_schema,
+                recipient=recipient_payload,
             )
         except Exception as e:
             return CallETriageOutput(
@@ -120,6 +137,7 @@ async def call_e_initiate_triage(input_data: CallETriageInput) -> CallETriageOut
         raw_response = await mock_client.create_and_wait(
             task=formatted_task,
             result_schema=input_data.result_schema,
+            recipient=recipient_payload,
         )
 
     # Defensively parse output

@@ -32,6 +32,16 @@ class CallETriageStructuredResult(BaseModel):
     driver_action_taken: str = Field(default="", description="Actions performed on site")
 
 
+class CallERecipient(BaseModel):
+    """Target recipient information for CALL-E telephony."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    phone: str = Field(..., description="Recipient phone number in E.164 format")
+    region: str = Field("US", description="ISO country code (e.g. 'US', 'IN')")
+    locale: str = Field("en-US", description="Language/locale for the call (e.g. 'en-US')")
+
+
 class CallETriageInput(BaseModel):
     """Input payload for initiating a CALL-E outbound triage telephone call."""
 
@@ -41,6 +51,7 @@ class CallETriageInput(BaseModel):
     driver_locale: str = Field("en-US", description="Language/accent locale for call")
     task_instructions: str = Field(..., description="Declarative instructions and constraints for CALL-E agent")
     result_schema: dict[str, Any] = Field(..., description="JSON Schema defining expected structured result")
+    recipient: Optional[CallERecipient] = Field(default=None, description="Structured recipient specification")
 
 
 class CallETriageOutput(BaseModel):

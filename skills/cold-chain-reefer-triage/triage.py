@@ -62,6 +62,16 @@ class CallETriageStructuredResult(BaseModel):
     )
 
 
+class CallERecipient(BaseModel):
+    """Target recipient information for CALL-E telephony."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    phone: str = Field(..., description="Recipient phone number in E.164 format")
+    region: str = Field("US", description="ISO country code (e.g. 'US', 'IN')")
+    locale: str = Field("en-US", description="Language/locale for the call (e.g. 'en-US')")
+
+
 class CallETriageOutput(BaseModel):
     """Top-level response model from CALL-E reefer triage invocation."""
 
@@ -143,10 +153,16 @@ def initiate_reefer_triage(
     )
 
     try:
+        derived_region = "IN" if driver_phone.startswith("+91") else "US"
+        recipient_data = {
+            "phone": driver_phone,
+            "region": derived_region,
+        }
         # Call CALL-E SDK
         call_response = client.calls.create_and_wait(
             task=task_prompt,
             result_schema=CallETriageStructuredResult.model_json_schema(),
+            recipient=recipient_data,
         )
 
         # Helper to extract attributes from dict or object safely

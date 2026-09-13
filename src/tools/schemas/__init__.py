@@ -1,6 +1,7 @@
 """Tool schemas and structured outputs for Cold Chain Sentinel."""
 
 from src.tools.schemas.call_e_initiate_triage import (
+    CallERecipient,
     CallETriageInput,
     CallETriageOutput,
     CallETriageStructuredResult,
@@ -28,6 +29,7 @@ from src.tools.schemas.warehouse_reserve_dock import (
 )
 
 __all__ = [
+    "CallERecipient",
     "CallETriageInput",
     "CallETriageOutput",
     "CallETriageStructuredResult",

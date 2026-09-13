@@ -114,9 +114,49 @@ def test_skill_standalone_execution():
     assert output.structured_result.selected_option == "DIVERT_TO_COLD_HUB"
     assert output.structured_result.driver_hos_minutes_remaining == 50
 
-    # Verify task prompt started with Call + phone
+    # Verify task prompt started with Call + phone and recipient region is US
     call_args = mock_calle.calls.create_and_wait.call_args[1]
     assert call_args["task"].startswith("Call +12065550198 and speak with driver Elena Rostova")
+    assert call_args["recipient"]["region"] == "US"
+
+
+def test_skill_standalone_execution_india_region():
+    """Verify initiate_reefer_triage dynamically sets region='IN' for Indian phone numbers (+91)."""
+    mock_calle = MagicMock()
+    mock_calle.calls.create_and_wait.return_value = {
+        "id": "calle_skill_india_001",
+        "status": "completed",
+        "task_completed": True,
+        "completion_confidence": {"score": 0.95, "label": "HIGH"},
+        "structured_result": {
+            "driver_verified_safe_location": True,
+            "reefer_engine_running": True,
+            "air_bulkhead_obstructed": False,
+            "cargo_sweating_detected": False,
+            "driver_reported_alarm_code": "ALARM 18",
+            "driver_hos_minutes_remaining": 45,
+            "selected_option": "DIVERT_TO_COLD_HUB",
+            "emergency_reported": False,
+        },
+        "evidence": {},
+    }
+
+    output = initiate_reefer_triage(
+        client=mock_calle,
+        driver_phone="+916395536126",
+        driver_name="Ayush",
+        truck_id="TRK-902",
+        trailer_id="TRL-904",
+        current_temp_f=-6.2,
+        setpoint_temp_f=-20.0,
+        nearest_cold_hub_name="Test Cold Hub",
+        nearest_cold_hub_eta_minutes=15,
+    )
+
+    assert output.task_completed is True
+    call_args = mock_calle.calls.create_and_wait.call_args[1]
+    assert call_args["recipient"]["phone"] == "+916395536126"
+    assert call_args["recipient"]["region"] == "IN"
 
 
 def test_skill_standalone_execution_dict_response():
