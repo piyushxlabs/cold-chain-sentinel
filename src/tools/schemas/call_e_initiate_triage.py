@@ -59,3 +59,7 @@ class CallETriageOutput(BaseModel):
     )
     evidence: dict[str, Any] = Field(default_factory=dict, description="Call evidence reference metadata")
     error: Optional[str] = Field(default=None, description="Error description if call failed")
+
+
+# Default strict JSON Schema for CALL-E result_schema parameter
+CALLE_TRIAGE_RESULT_JSON_SCHEMA = CallETriageStructuredResult.model_json_schema()

@@ -161,23 +161,23 @@ class SentinelState(TypedDict, total=False):
     """LangGraph StateGraph typed dictionary representation for Cold Chain Sentinel."""
 
     # Entry fields (immutable-after-init)
-    event_id: Annotated[str, reduce_immutable]
-    session_id: Annotated[str, reduce_immutable]
-    timestamp: Annotated[str | datetime, reduce_immutable]
-    truck_id: Annotated[str, reduce_immutable]
-    trailer_id: Annotated[str, reduce_immutable]
-    current_temp_f: Annotated[float, reduce_immutable]
-    setpoint_temp_f: Annotated[float, reduce_immutable]
-    temp_differential_f: Annotated[float, reduce_immutable]
-    duration_minutes: Annotated[int, reduce_immutable]
-    telematics_alarm_code: Annotated[str, reduce_immutable]
-    current_coordinates: Annotated[Coordinates, reduce_immutable]
-    target_destination: Annotated[str, reduce_immutable]
-    origin: Annotated[str, reduce_immutable]
-    cargo_manifest: Annotated[CargoManifest, reduce_immutable]
-    driver_phone_e164: Annotated[str, reduce_immutable]
-    driver_name: Annotated[str, reduce_immutable]
-    driver_locale: Annotated[str, reduce_immutable]
+    event_id: Annotated[str | None, reduce_immutable]
+    session_id: Annotated[str | None, reduce_immutable]
+    timestamp: Annotated[str | datetime | None, reduce_immutable]
+    truck_id: Annotated[str | None, reduce_immutable]
+    trailer_id: Annotated[str | None, reduce_immutable]
+    current_temp_f: Annotated[float | None, reduce_immutable]
+    setpoint_temp_f: Annotated[float | None, reduce_immutable]
+    temp_differential_f: Annotated[float | None, reduce_immutable]
+    duration_minutes: Annotated[int | None, reduce_immutable]
+    telematics_alarm_code: Annotated[str | None, reduce_immutable]
+    current_coordinates: Annotated[Coordinates | None, reduce_immutable]
+    target_destination: Annotated[str | None, reduce_immutable]
+    origin: Annotated[str | None, reduce_immutable]
+    cargo_manifest: Annotated[CargoManifest | None, reduce_immutable]
+    driver_phone_e164: Annotated[str | None, reduce_immutable]
+    driver_name: Annotated[str | None, reduce_immutable]
+    driver_locale: Annotated[str | None, reduce_immutable]
 
     # Enrichment fields (written by enrichment node - last-write-wins)
     tms_verified: Annotated[bool, reduce_last_write_wins]
@@ -211,4 +211,4 @@ class SentinelState(TypedDict, total=False):
     execution_timestamp: Annotated[datetime | None, reduce_last_write_wins]
 
     # Config (immutable-after-init)
-    config: Annotated[RuntimeConfig, reduce_immutable]
+    config: Annotated[RuntimeConfig | None, reduce_immutable]
