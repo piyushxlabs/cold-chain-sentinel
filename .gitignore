@@ -95,3 +95,6 @@ cold-chain-sentinel-demo-slides.html
 # Reference / scratch files
 README_1.md
 *.bak
+# Forked upstream workspace
+awesome-phone-call-agents/
+upstream-awesome-agents/ 
