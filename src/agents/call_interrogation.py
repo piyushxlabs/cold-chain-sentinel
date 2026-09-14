@@ -153,7 +153,10 @@ async def call_interrogation_node(state: SentinelState) -> dict[str, Any]:
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
         )
-        escalation_reasons.append(f"call_status_{output.status}")
+        if output.status != "completed":
+            escalation_reasons.append(f"call_status_{output.status}")
+        else:
+            escalation_reasons.append("telephony_triage_incomplete")
         requires_override = True
 
         audit_event = AuditEvent(

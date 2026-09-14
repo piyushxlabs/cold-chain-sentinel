@@ -115,3 +115,24 @@ def test_build_evaluation_prompt():
     assert "BOL-9901" in prompt
     assert "Biologics" in prompt
     assert "driver_hos_minutes_remaining" in prompt
+
+
+@pytest.mark.asyncio
+async def test_execute_compliance_evaluation_overrides_reviewer_model():
+    """Verify execute_compliance_evaluation programmatically binds active_model_name."""
+    from unittest.mock import AsyncMock, MagicMock
+    from src.agents.compliance_review import execute_compliance_evaluation
+
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    # Simulate LLM hallucinating gemini-1.5-pro in structured JSON output
+    mock_response.text = (
+        '{"claim_risk_level": "LOW", "review_confidence": 0.9, '
+        '"suspected_injection": false, "reviewer_model": "gemini-1.5-pro", '
+        '"reasoning_summary": "Verified per physical_observations.cargo_sweating_detected"}'
+    )
+    mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+
+    decision = await execute_compliance_evaluation(mock_client, "gemini-3.5-flash", "test prompt")
+    # Must override hallucinated gemini-1.5-pro with active model name gemini-3.5-flash
+    assert decision.reviewer_model == "gemini-3.5-flash"

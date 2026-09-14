@@ -79,7 +79,11 @@ async def decision_gate_node(state: SentinelState) -> dict[str, Any]:
         agreed_action = "ESCALATE_TO_HUMAN_DISPATCH"
         disposition = "ESCALATED_HOS_BREACH"
         requires_override = True
-        escalation_reasons.append(f"insufficient_hos_for_reroute_{driver_hos}m_lt_{min_hos}m")
+        if driver_hos is None:
+            hos_reason = "insufficient_hos_for_reroute_missing_hos_data"
+        else:
+            hos_reason = f"insufficient_hos_for_reroute_{driver_hos}m_lt_{min_hos}m"
+        escalation_reasons.append(hos_reason)
 
     # Gate 4: FSMA Biologics/Pharma Cargo Sweating Spoilage Gate
     elif (
@@ -126,6 +130,13 @@ async def decision_gate_node(state: SentinelState) -> dict[str, Any]:
         agreed_action = "CONTINUE_MONITORED_ROUTE"
         disposition = "AUTONOMOUSLY_RESOLVED_CONTINUE"
 
+    existing_reasons = state.get("escalation_reasons", []) or []
+    unique_new_reasons = [
+        r for r in list(dict.fromkeys(escalation_reasons))
+        if r not in existing_reasons
+    ]
+    all_reasons = list(dict.fromkeys(existing_reasons + escalation_reasons))
+
     audit_event = AuditEvent(
         event_type="NODE_COMPLETED",
         node_name="decision_gate",
@@ -134,7 +145,7 @@ async def decision_gate_node(state: SentinelState) -> dict[str, Any]:
             "agreed_action": agreed_action,
             "disposition": disposition,
             "requires_immediate_human_override": requires_override,
-            "escalation_reasons": escalation_reasons,
+            "escalation_reasons": all_reasons,
         },
     )
 
@@ -146,7 +157,7 @@ async def decision_gate_node(state: SentinelState) -> dict[str, Any]:
 
     if requires_override:
         updates["requires_immediate_human_override"] = True
-    if escalation_reasons:
-        updates["escalation_reasons"] = escalation_reasons
+    if unique_new_reasons:
+        updates["escalation_reasons"] = unique_new_reasons
 
     return updates

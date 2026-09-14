@@ -196,3 +196,25 @@ async def test_node_execution_sequence() -> None:
     # Test Persistence Audit
     persistence_res = await persistence_audit_node(actuation_state)
     assert persistence_res["execution_timestamp"] is not None
+
+
+@pytest.mark.asyncio
+async def test_decision_gate_missing_hos_string_and_deduplication():
+    """Verify decision_gate formats missing HOS data cleanly and deduplicates reasons."""
+    from src.agents.decision_gate import decision_gate_node
+
+    state = {
+        "event_id": "evt_test_missing_hos",
+        "driver_hos_minutes_remaining": None,  # Missing HOS
+        "escalation_reasons": ["call_status_failed"],  # Existing reason
+        "tool_artifacts": {},
+    }
+
+    res = await decision_gate_node(state)  # type: ignore
+    assert res["disposition"] == "ESCALATED_HOS_BREACH"
+    assert "escalation_reasons" in res
+    # Must format as missing_hos_data, never Nonem_lt_35m
+    assert "insufficient_hos_for_reroute_missing_hos_data" in res["escalation_reasons"]
+    assert not any("Nonem" in r for r in res["escalation_reasons"])
+    # Must not duplicate call_status_failed
+    assert res["escalation_reasons"].count("call_status_failed") == 0

@@ -136,6 +136,8 @@ async def execute_compliance_evaluation(
         raise ValueError(f"Empty response received from Gemini model: {model_name}")
 
     decision = ComplianceReviewDecision.model_validate_json(response.text)
+    # Explicitly bind the active runtime model name instead of trusting model self-report
+    decision.reviewer_model = model_name
     return decision
 
 

@@ -14,7 +14,8 @@ export const EscalationAlertBanner: React.FC<EscalationAlertBannerProps> = ({
   severity = "P0",
   alertId = "alrt_live",
 }) => {
-  if (!reasons || reasons.length === 0) return null;
+  const uniqueReasons = Array.from(new Set(reasons || []));
+  if (uniqueReasons.length === 0) return null;
 
   return (
     <div
@@ -51,7 +52,7 @@ export const EscalationAlertBanner: React.FC<EscalationAlertBannerProps> = ({
           Triggered Safety / Regulatory Escalation Reasons:
         </span>
         <ul className="space-y-1 text-xs">
-          {reasons.map((reason, idx) => (
+          {uniqueReasons.map((reason, idx) => (
             <li key={idx} className="flex items-start gap-2 bg-rose-950/60 p-2 rounded border border-rose-800/50">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
               <span className="font-medium text-rose-100">{reason}</span>

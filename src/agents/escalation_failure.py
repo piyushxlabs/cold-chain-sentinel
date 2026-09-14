@@ -22,9 +22,12 @@ async def escalation_failure_node(state: SentinelState) -> dict[str, Any]:
     Non-LLM deterministic node. Bound ONLY to ops_alert_escalate.
     """
     event_id = state.get("event_id", "")
-    escalation_reasons = state.get("escalation_reasons", [])
-    if not escalation_reasons:
-        escalation_reasons = ["unspecified_safety_gate_trip"]
+    existing_reasons = state.get("escalation_reasons", []) or []
+    deduped_reasons = list(dict.fromkeys(existing_reasons))
+    new_reasons_to_append: list[str] = []
+    if not deduped_reasons:
+        deduped_reasons = ["unspecified_safety_gate_trip"]
+        new_reasons_to_append = ["unspecified_safety_gate_trip"]
 
     state_summary = {
         "truck_id": state.get("truck_id"),
@@ -41,7 +44,7 @@ async def escalation_failure_node(state: SentinelState) -> dict[str, Any]:
     output = await ops_alert_escalate(
         OpsAlertInput(
             event_id=event_id,
-            escalation_reasons=escalation_reasons,
+            escalation_reasons=deduped_reasons,
             severity_level="P0_CRITICAL",
             state_summary=state_summary,
         )
@@ -67,18 +70,22 @@ async def escalation_failure_node(state: SentinelState) -> dict[str, Any]:
             "alert_id": output.alert_id,
             "delivered": output.delivered,
             "channel": output.channel,
-            "escalation_reasons": escalation_reasons,
+            "escalation_reasons": deduped_reasons,
         },
     )
 
     agreed_action = state.get("agreed_action") or "ESCALATE_TO_HUMAN_DISPATCH"
     disposition = state.get("disposition") or "ESCALATED_MANUAL_OVERRIDE"
 
-    return {
+    updates: dict[str, Any] = {
         "agreed_action": agreed_action,
         "disposition": disposition,
         "requires_immediate_human_override": True,
-        "escalation_reasons": escalation_reasons,
         "tool_artifacts": tool_artifacts,
         "audit_trail": [audit_event],
     }
+
+    if new_reasons_to_append:
+        updates["escalation_reasons"] = new_reasons_to_append
+
+    return updates
