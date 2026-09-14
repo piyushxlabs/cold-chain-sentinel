@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="./assets/README_banner.png" alt="Cold Chain Sentinel — Autonomous Voice Triage Engine for Cold-Chain Logistics" width="100%" style="border-radius: 12px; margin-bottom: 16px;" />
+
 # ❄️ COLD CHAIN SENTINEL
 
 ### Autonomous Real-Time Voice Triage Engine for Cold-Chain Telematics Excursions
@@ -21,10 +23,10 @@
 > ### 📺 **Official Video Demonstration & Architecture Walkthrough (2.5-Minute Master Demo — 1080p60)**
 >
 > <div align="center">
->   <a href="https://youtu.be/cold-chain-sentinel-demo" target="_blank">
+>   <a href="https://youtu.be/laVDo52TTZ0?si=mYVJGMKFegO1ZNyQ" target="_blank">
 >     <img src="./assets/demo_thumbnail.png" alt="Cold Chain Sentinel Live Demo" width="100%" style="border-radius: 10px; max-width: 820px;" />
 >   </a>
->   <p><strong>▶️ <a href="https://youtu.be/cold-chain-sentinel-demo" target="_blank">Watch Cold Chain Sentinel Live Demo & Architecture Walkthrough (1080p60)</a></strong></p>
+>   <p><strong>▶️ <a href="https://youtu.be/laVDo52TTZ0?si=mYVJGMKFegO1ZNyQ" target="_blank">Watch Cold Chain Sentinel Live Demo & Architecture Walkthrough (1080p60)</a></strong></p>
 >   <p><em>8-Node LangGraph Determinism • Live CALL-E Driver Interrogation • Gemini 3.5 Flash Cognitive Audit • P0 Human Fail-Safe</em></p>
 > </div>
 
@@ -539,7 +541,8 @@ uv run pytest -v
 
 ```
 cold-chain-sentinel/
-├── assets/                                  # Visual docs & screenshots (add your own)
+├── assets/                                  # Visual docs & screenshots
+│   ├── README_banner.png                    # Hero banner (top of README)
 │   ├── demo_thumbnail.png                   # YouTube demo thumbnail
 │   ├── dashboard_carbon_cockpit_full.png    # Cockpit 3-panel overview
 │   ├── dashboard_autonomous_healing.png     # Node 06 actuation card
