@@ -69,7 +69,6 @@ Thumbs.db
 *.swp
 *.swo
 
-
 # Internal AI Agent / Dev-process files (not for public repo)
 progress_log.md
 project_state.md
@@ -78,13 +77,21 @@ do_after_completion.md
 
 # AI coding assistant configuration
 .agents/
+CLAUDE.md
 
 # Internal specification docs (kept local only)
 docs/
 .docs/
 
-# Raw Demo Video Footage & Local Scratch Slides
+# Raw Demo Video Footage, Assets & Local Scratch Slides
 demo video/
+demo video assets/
 *.mp4
 *.mp3
+*.mov
+*.avi
 cold-chain-sentinel-demo-slides.html
+
+# Reference / scratch files
+README_1.md
+*.bak
