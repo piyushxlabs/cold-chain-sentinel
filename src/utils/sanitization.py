@@ -9,8 +9,9 @@ import re
 
 from src.state.exceptions import StateValidationError
 
-E164_REGEX = re.compile(r"^\+[1-9]\d{7,14}$")
+E164_REGEX = re.compile(r"^\+[1-9][0-9]{1,14}$", re.ASCII)
 IDENTIFIER_REGEX = re.compile(r"^[a-zA-Z0-9_\-\.]+$")
+PHONE_REDACTION_PATTERN = re.compile(r"\+?[0-9]{7,15}", re.ASCII)
 
 INJECTION_PATTERNS = [
     re.compile(r"ignore\s+(all\s+)?(previous|prior)\s+instructions", re.IGNORECASE),
@@ -22,8 +23,48 @@ INJECTION_PATTERNS = [
 ]
 
 
+def mask_phone(phone: str | None) -> str:
+    """Mask phone number for safe logging (e.g. +13035550147 -> +1303***0147)."""
+    if not phone or not isinstance(phone, str):
+        return ""
+    clean = phone.strip()
+    if len(clean) >= 8:
+        return f"{clean[:5]}***{clean[-4:]}"
+    elif len(clean) >= 4:
+        return f"{clean[:2]}***{clean[-2:]}"
+    return "***"
+
+
+def redact_phone_numbers(text_or_obj: any) -> any:
+    """Recursively redact phone numbers in strings, dictionaries, or lists."""
+    if isinstance(text_or_obj, str):
+        return PHONE_REDACTION_PATTERN.sub(lambda m: mask_phone(m.group(0)), text_or_obj)
+    elif isinstance(text_or_obj, dict):
+        return {k: redact_phone_numbers(v) for k, v in text_or_obj.items()}
+    elif isinstance(text_or_obj, list):
+        return [redact_phone_numbers(item) for item in text_or_obj]
+    return text_or_obj
+
+
+def sanitize_error_message(error_msg: str) -> str:
+    """Sanitize raw error messages to avoid leaking API tokens, sensitive headers, or raw phone numbers."""
+    if not error_msg:
+        return ""
+    # Strip potential Bearer tokens or secret keys
+    sanitized = re.sub(r"(Bearer\s+)[A-Za-z0-9_\-\.]{8,}", r"\1[REDACTED]", error_msg)
+    sanitized = re.sub(
+        r"(api[_-]?key\s*[:=]\s*)[A-Za-z0-9_\-\.]{8,}",
+        r"\1[REDACTED]",
+        sanitized,
+        flags=re.IGNORECASE,
+    )
+    # Redact raw phone numbers (replace matches of \+?[0-9]{7,15} with masked versions like +1303***0147)
+    sanitized = redact_phone_numbers(sanitized)
+    return sanitized
+
+
 def validate_e164_phone(phone: str) -> bool:
-    """Validate that phone number adheres strictly to E.164 format."""
+    """Validate that phone number adheres strictly to ASCII-only E.164 format."""
     if not phone or not isinstance(phone, str):
         return False
     return bool(E164_REGEX.match(phone.strip()))

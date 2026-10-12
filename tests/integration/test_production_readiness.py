@@ -22,6 +22,11 @@ _spec.loader.exec_module(_triage_mod)
 StandaloneCallETriageOutput = _triage_mod.CallETriageOutput
 StandaloneCallETriageStructuredResult = _triage_mod.CallETriageStructuredResult
 initiate_reefer_triage = _triage_mod.initiate_reefer_triage
+validate_e164_phone = _triage_mod.validate_e164_phone
+validate_calle_base_url = _triage_mod.validate_calle_base_url
+mask_phone = _triage_mod.mask_phone
+redact_phone_numbers = _triage_mod.redact_phone_numbers
+sanitize_error_message = _triage_mod.sanitize_error_message
 
 from src.state.checkpointing import get_checkpointer, get_async_checkpointer
 from src.agents.graph import build_sentinel_graph
@@ -105,6 +110,7 @@ def test_skill_standalone_execution():
         setpoint_temp_f=34.0,
         nearest_cold_hub_name="Test Cold Hub",
         nearest_cold_hub_eta_minutes=15,
+        live=True,
     )
 
     assert output.task_completed is True
@@ -152,6 +158,7 @@ def test_skill_standalone_execution_india_region():
         setpoint_temp_f=-20.0,
         nearest_cold_hub_name="Test Cold Hub",
         nearest_cold_hub_eta_minutes=15,
+        live=True,
     )
 
     assert output.task_completed is True
@@ -191,6 +198,7 @@ def test_skill_standalone_execution_dict_response():
         setpoint_temp_f=34.0,
         nearest_cold_hub_name="Test Cold Hub",
         nearest_cold_hub_eta_minutes=15,
+        live=True,
     )
 
     assert output.task_completed is True
@@ -198,6 +206,82 @@ def test_skill_standalone_execution_dict_response():
     assert output.call_id == "calle_skill_dict_001"
     assert output.completion_confidence == 0.96
     assert output.structured_result is not None
+
+
+def test_skill_ascii_e164_validation_rejects_unicode():
+    """Verify ASCII-only E.164 regex rejects Unicode digits and emergency numbers."""
+    from src.utils.sanitization import validate_e164_phone as utils_validate_e164
+
+    # Valid ASCII E.164 numbers (both skill and utils)
+    for validator in (validate_e164_phone, utils_validate_e164):
+        assert validator("+12065550198") is True
+        assert validator("+916395536126") is True
+        assert validator("+442071838750") is True
+
+        # Rejection of Unicode digits (e.g. Arabic-Indic \u0661 or Devanagari \u0967)
+        assert validator("+1206555\u0661\u0662\u0663\u0664") is False
+        assert validator("+91\u0967\u0968\u0969456789") is False
+
+        # Rejection of non-E.164 formats
+        assert validator("911") is False
+        assert validator("555-0198") is False
+        assert validator(None) is False
+        assert validator("") is False
+
+    # Emergency number exclusion in skill
+    assert validate_e164_phone("+1911") is False
+
+
+def test_skill_approved_https_origin_whitelist():
+    """Verify validate_calle_base_url enforces HTTPS and approved origins whitelist."""
+    # Approved origins
+    assert validate_calle_base_url("https://api.heycall-e.com") == "https://api.heycall-e.com"
+    assert validate_calle_base_url("https://heycall-e.com") == "https://heycall-e.com"
+    assert validate_calle_base_url("https://test-api.heycall-e.com") == "https://test-api.heycall-e.com"
+    assert validate_calle_base_url("https://localhost:8000") == "https://localhost:8000"
+    assert validate_calle_base_url("https://127.0.0.1:8000") == "https://127.0.0.1:8000"
+    assert validate_calle_base_url(None) == "https://api.heycall-e.com"
+
+    # Insecure HTTP rejected
+    with pytest.raises(ValueError, match="Insecure CALLE_BASE_URL"):
+        validate_calle_base_url("http://api.heycall-e.com")
+
+    with pytest.raises(ValueError, match="Insecure CALLE_BASE_URL"):
+        validate_calle_base_url("http://localhost:8000")
+
+    # Unapproved external hosts rejected
+    with pytest.raises(ValueError, match="Unauthorized CALLE_BASE_URL host"):
+        validate_calle_base_url("https://evil.example.com")
+
+    with pytest.raises(ValueError, match="Unauthorized CALLE_BASE_URL host"):
+        validate_calle_base_url("https://attacker.io/calle")
+
+
+def test_skill_phone_redaction_in_errors_and_evidence():
+    """Verify phone numbers are redacted in error messages and evidence payloads."""
+    # Basic masking
+    assert mask_phone("+13035550147") == "+1303***0147"
+    assert mask_phone("+916395536126") == "+9163***6126"
+
+    # Error message sanitization with token and phone redaction
+    err = "Bearer secret_token_12345 failed calling +13035550147 at endpoint"
+    sanitized = sanitize_error_message(err)
+    assert "[REDACTED]" in sanitized
+    assert "+13035550147" not in sanitized
+    assert "+1303***0147" in sanitized
+
+    # Nested evidence redaction
+    evidence = {
+        "transcript": "Driver at +12065550198 confirmed reefer running",
+        "contacts": ["+13035550147", "+916395536126"],
+        "nested": {"caller": "+12065550198"},
+    }
+    redacted = redact_phone_numbers(evidence)
+    assert "+12065550198" not in redacted["transcript"]
+    assert "+1206***0198" in redacted["transcript"]
+    assert "+1303***0147" in redacted["contacts"]
+    assert "+9163***6126" in redacted["contacts"]
+    assert "+1206***0198" == redacted["nested"]["caller"]
 
 
 # ==============================================================================
